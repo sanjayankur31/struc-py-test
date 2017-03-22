@@ -266,6 +266,106 @@ class StructralPlasticityExample:
         self.total_connections_i.append(sum(neuron['Axon_in']['z_connected']
                                             for neuron in syn_elems_i))
 
+    '''A function to update connectivity manually.'''
+
+    def update_connectivity(self):
+        synaptic_elms = []
+        neurons = (nest.GetStatus(self.nodes_e, ['global_id', 'synaptic_elements']))
+        for neuron in neurons:
+            gid = neuron[0]
+            synelms = neuron[1]
+            source_elms_con = synelms['Axon_ex']['z_connected']
+            target_elms_con_ex = synelms['Den_ex']['z_connected']
+            target_elms_con_in = synelms['Den_in']['z_connected']
+            source_elms_total = synelms['Axon_ex']['z']
+            target_elms_total_ex = synelms['Den_ex']['z']
+            target_elms_total_in = synelms['Den_in']['z']
+            delta_z_ax = source_elms_con - source_elms_total
+            delta_z_d_ex = target_elms_con_ex - target_elms_total_ex
+            delta_z_d_in = target_elms_con_in - target_elms_total_in
+
+            synaptic_elms.append({gid: {'ax_ex': delta_z_ax,
+                                           'd_ex': delta_z_d_ex,
+                                           'd_in': delta_z_d_in,
+                                           }
+                                  })
+        neurons = (nest.GetStatus(self.nodes_i, ['global_id', 'synaptic_elements']))
+        for neuron in neurons:
+            gid = neuron[0]
+            synelms = neuron[1]
+            source_elms_con = synelms['Axon_in']['z_connected']
+            target_elms_con_ex = synelms['Den_ex']['z_connected']
+            target_elms_con_in = synelms['Den_in']['z_connected']
+            source_elms_total = synelms['Axon_in']['z']
+            target_elms_total_ex = synelms['Den_ex']['z']
+            target_elms_total_in = synelms['Den_in']['z']
+            delta_z_ax = source_elms_con - source_elms_total
+            delta_z_d_ex = target_elms_con_ex - target_elms_total_ex
+            delta_z_d_in = target_elms_con_in - target_elms_total_in
+
+            synaptic_elms.append({gid: {'ax_in': delta_z_ax,
+                                           'd_ex': delta_z_d_ex,
+                                           'd_in': delta_z_d_in,
+                                           }
+                                  })
+
+            for neuron in synaptic_elms:
+                if 'ax_ex' in neuron and neuron['ax_ex'] < 0:
+                    # ideally could use the synapse model as a filter assuming
+                    # we restrict the user to use a unique name for each pair of
+                    # synaptic elements
+                    conns = nest.GetConnections([neuron])
+                    targets = []
+                    for con in conns:
+                        target = con[1]
+                        if 'd_ex' in synaptic_elems[target - 1]:
+                            targets.append(target)
+
+                    chosen_target = numpy.random.randint(0, len(targets))
+                    nest.Disconnect(neuron, chosen_target)
+
+                if 'ax_in' in neuron and neuron['ax_in'] < 0:
+                    # ideally could use the synapse model as a filter assuming
+                    # we restrict the user to use a unique name for each pair of
+                    # synaptic elements
+                    conns = nest.GetConnections([neuron])
+                    targets = []
+                    for con in conns:
+                        target = con[1]
+                        if 'd_in' in synaptic_elems[target - 1]:
+                            targets.append(target)
+
+                    chosen_target = numpy.random.randint(0, len(targets))
+                    nest.Disconnect(neuron, chosen_target)
+                if 'd_ex' in neuron and neuron['d_ex'] < 0:
+                    # ideally could use the synapse model as a filter assuming
+                    # we restrict the user to use a unique name for each pair of
+                    # synaptic elements
+                    conns = nest.GetConnections([neuron])
+                    sources = []
+                    for con in conns:
+                        source = con[0]
+                        if 'ax_ex' in synaptic_elems[source - 1]:
+                            sources.append(source)
+
+                    chosen_source = numpy.random.randint(0, len(sources))
+                    nest.Disconnect(chosen_source, neuron)
+                if 'd_in' in neuron and neuron['d_in'] < 0:
+                    # ideally could use the synapse model as a filter assuming
+                    # we restrict the user to use a unique name for each pair of
+                    # synaptic elements
+                    conns = nest.GetConnections([neuron])
+                    sources = []
+                    for con in conns:
+                        source = con[0]
+                        if 'ax_in' in synaptic_elems[source - 1]:
+                            sources.append(source)
+
+                    chosen_source = numpy.random.randint(0, len(sources))
+                    nest.Disconnect(chosen_source, neuron)
+
+
+
     '''
     We define a function to plot the recorded values
     at the end of the simulation.
@@ -314,6 +414,7 @@ class StructralPlasticityExample:
             nest.Simulate(self.record_interval)
             self.record_ca()
             self.record_connectivity()
+            self.update_connectivity()
             if i % 20 == 0:
                 print("Progress: " + str(i / 2) + "%")
         print("Simulation finished successfully")

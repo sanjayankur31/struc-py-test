@@ -67,6 +67,7 @@ class StructralPlasticityExample:
         # rate of background Poisson input
         self.bg_rate = 10000.0
         self.neuron_model = 'iaf_psc_exp'
+        random.seed(42)
 
         '''
         In this implementation of structural plasticity, neurons grow
@@ -133,6 +134,8 @@ class StructralPlasticityExample:
         self.mean_ca_i = []
         self.total_connections_e = []
         self.total_connections_i = []
+        self.total_axons_e = []
+        self.total_axons_i = []
 
         '''
         We initialize variables for the post-synaptic currents of the
@@ -226,8 +229,6 @@ class StructralPlasticityExample:
         nest.SetStatus(self.nodes_e, 'synaptic_elements', synaptic_elements)
         nest.SetStatus(self.nodes_i, 'synaptic_elements', synaptic_elements_i)
 
-        # print(self.nodes_e + self.nodes_i)
-
     def connect_external_input(self):
         '''
         We create and connect the Poisson generator for external input
@@ -265,38 +266,34 @@ class StructralPlasticityExample:
     def record_connectivity(self):
         syn_elems_e = nest.GetStatus(self.nodes_e, 'synaptic_elements')
         syn_elems_i = nest.GetStatus(self.nodes_i, 'synaptic_elements')
+
+        axons_e = []
+        axons_i = []
+
+        for neuron in syn_elems_e:
+            axons_e.append(neuron['Axon_ex']['z'])
+        self.total_axons_e.append(numpy.mean(axons_e))
+        for neuron in syn_elems_i:
+            axons_i.append(neuron['Axon_in']['z'])
+        self.total_axons_i.append(numpy.mean(axons_i))
+
         self.total_connections_e.append(sum(neuron['Axon_ex']['z_connected']
                                             for neuron in syn_elems_e))
         self.total_connections_i.append(sum(neuron['Axon_in']['z_connected']
                                             for neuron in syn_elems_i))
-        # print("Connected elms e: {}, Connected elms i {}".format(
-        #     self.total_connections_e[-1], self.total_connections_i[-1]))
 
     '''A function to update connectivity manually.'''
 
     def update_connectivity(self):
         synaptic_elms = self.collect_syn_elms()
-        # print('BEFORE DELETE: {}'.format(synaptic_elms))
-        # self.record_connectivity()
-        # print("BEFORE DELETE: cons E: {}, cons I: {}".format(self.total_connections_e[-1], self.total_connections_i[-1]))
         self.delete_connections(synaptic_elms)
-        # self.record_connectivity()
-        # print("AFTER DELETE: cons E: {}, cons I: {}".format(self.total_connections_e[-1], self.total_connections_i[-1]))
 
         synaptic_elms = self.collect_syn_elms()
-        # print('AFTER DELETE: {}'.format(synaptic_elms))
-
-        # self.record_connectivity()
-        # print("BEFORE CONNECT: cons E: {}, cons I: {}".format(self.total_connections_e[-1], self.total_connections_i[-1]))
         self.create_connections(synaptic_elms)
 
         self.record_connectivity()
         self.record_ca()
-        print("AFTER UPDATE: cons E: {}, cons I: {}, Cal E: {}, Cal I: {}".format(self.total_connections_e[-1], self.total_connections_i[-1], self.mean_ca_e[-1], self.mean_ca_i[-1]))
-        # synaptic_elms = self.collect_syn_elms()
-        # print('AFTER CREATE: {}'.format(synaptic_elms))
-        # print((nest.GetStatus((self.nodes_e + self.nodes_i), ['global_id', 'synaptic_elements'])))
-        # print(nest.GetConnections(source=(self.nodes_e + self.nodes_i)))
+        # print("AFTER UPDATE: cons E: {}, cons I: {}, Cal E: {}, Mean Ax_ex: {}, Cal I: {}, Mean Ax_in: {}".format(self.total_connections_e[-1], self.total_connections_i[-1], self.mean_ca_e[-1], self.total_axons_e[-1], self.mean_ca_i[-1], self.total_axons_i[-1]))
 
     def collect_syn_elms(self):
         synaptic_elms = []
@@ -365,13 +362,14 @@ class StructralPlasticityExample:
 
                 if len(targets) > 0:
                     chosen_targets = targets if len(targets) < int(neuron['ax_ex']) else random.sample(targets, int(neuron['ax_ex']))
-                    nest.Connect([neuron['gid']], chosen_targets, conn_spec='all_to_all',
-                                 syn_spec={'model': 'synapse_ex',
-                                           'pre_synaptic_element': 'Axon_ex',
-                                           'post_synaptic_element': 'Den_ex'
-                                           })
+                    # print("Formation targets chosen: {} out of {} - len(targets): {}, neuron['ax_ex']: {}".format(chosen_targets, targets, len(targets), neuron['ax_ex']))
                     for cho in chosen_targets:
                         synaptic_elms[cho - 1]['d_ex'] -= 1
+                        nest.Connect([neuron['gid']], [cho], conn_spec='all_to_all',
+                                    syn_spec={'model': 'synapse_ex',
+                                            'pre_synaptic_element': 'Axon_ex',
+                                            'post_synaptic_element': 'Den_ex'
+                                            })
                     neuron['ax_ex'] -= len(chosen_targets)
 
             if 'ax_in' in neuron and neuron['ax_in'] > 0.0:
@@ -390,18 +388,19 @@ class StructralPlasticityExample:
 
                 if len(targets) > 0:
                     chosen_targets = targets if len(targets) < int(neuron['ax_in']) else random.sample(targets, int(neuron['ax_in']))
-                    nest.Connect([neuron['gid']], chosen_targets, conn_spec='all_to_all',
-                                 syn_spec={'model': 'synapse_in',
-                                           'pre_synaptic_element': 'Axon_in',
-                                           'post_synaptic_element': 'Den_in'
-                                           })
+                    # print("Formation targets chosen: {} out of {} - len(targets): {}, neuron['ax_in']: {}".format(chosen_targets, targets, len(targets), neuron['ax_in']))
                     for cho in chosen_targets:
                         synaptic_elms[cho - 1]['d_in'] -= 1
+                        nest.Connect([neuron['gid']], [cho], conn_spec='all_to_all',
+                                    syn_spec={'model': 'synapse_in',
+                                            'pre_synaptic_element': 'Axon_in',
+                                            'post_synaptic_element': 'Den_in'
+                                            })
                     neuron['ax_in'] -= len(chosen_targets)
 
 
     def delete_connections(self, synaptic_elms):
-        # print(synaptic_elms) for neuron in synaptic_elms: # print(neuron)
+        for neuron in synaptic_elms:
             if 'ax_ex' in neuron and neuron['ax_ex'] < 0.0:
                 # print('DELETE with ax_ex!')
                 # ideally could use the synapse model as a filter assuming
@@ -417,18 +416,19 @@ class StructralPlasticityExample:
 
                 if len(targets) > 0:
                     chosen_targets = random.sample(targets, int(abs(neuron['ax_ex']))) if len(targets) > int(abs(neuron['ax_ex'])) else targets
+                    # print("Deletion targets chosen: {} out of {}, len(targets): {}, neuron['ax_ex']: {}".format(chosen_targets, targets, len(targets), neuron['ax_ex']))
                     # print("Increasing d_ex for {}".format(targets[cho]))
-                    nest.Disconnect(pre=[neuron['gid']], post=chosen_targets, syn_spec={
-                        'model': 'synapse_ex',
-                        'pre_synaptic_element': 'Axon_ex',
-                        'post_synaptic_element': 'Den_ex'
-                    },
-                        conn_spec={
-                            'rule': 'all_to_all'
-                        }
-                    )
                     for target in chosen_targets:
                         synaptic_elms[target - 1]['d_ex'] += 1
+                        nest.Disconnect(pre=[neuron['gid']], post=[target], syn_spec={
+                            'model': 'synapse_ex',
+                            'pre_synaptic_element': 'Axon_ex',
+                            'post_synaptic_element': 'Den_ex'
+                        },
+                            conn_spec={
+                                'rule': 'all_to_all'
+                            }
+                        )
                     neuron['ax_ex'] += len(chosen_targets)
 
             if 'ax_in' in neuron and neuron['ax_in'] < 0.0:
@@ -446,18 +446,19 @@ class StructralPlasticityExample:
 
                 if len(targets) > 0:
                     chosen_targets = random.sample(targets, int(abs(neuron['ax_in']))) if len(targets) > int(abs(neuron['ax_in'])) else targets
+                    # print("Deletion targets chosen: {} out of {}, len(targets): {}, neuron['ax_in']: {}".format(chosen_targets, targets, len(targets), neuron['ax_in']))
                     # print("Increasing d_ex for {}".format(targets[cho]))
-                    nest.Disconnect(pre=[neuron['gid']], post=chosen_targets, syn_spec={
-                        'model': 'synapse_in',
-                        'pre_synaptic_element': 'Axon_in',
-                        'post_synaptic_element': 'Den_in'
-                    },
-                        conn_spec={
-                            'rule': 'all_to_all'
-                        }
-                    )
                     for target in chosen_targets:
                         synaptic_elms[target - 1]['d_in'] += 1
+                        nest.Disconnect(pre=[neuron['gid']], post=[target], syn_spec={
+                            'model': 'synapse_in',
+                            'pre_synaptic_element': 'Axon_in',
+                            'post_synaptic_element': 'Den_in'
+                        },
+                            conn_spec={
+                                'rule': 'all_to_all'
+                            }
+                        )
                     neuron['ax_in'] += len(chosen_targets)
 
             if 'd_ex' in neuron and neuron['d_ex'] < 0.0:
@@ -476,18 +477,19 @@ class StructralPlasticityExample:
                 # print("d_ex sources: {}".format(sources))
                 if len(sources) > 0:
                     chosen_sources = random.sample(sources, int(abs(neuron['d_ex']))) if len(sources) > int(abs(neuron['d_ex'])) else sources
+                    # print("Deletion targets chosen: {} out of {}, len(sources): {}, neuron['d_ex']: {}".format(chosen_sources, sources, len(sources), neuron['d_ex']))
                     # print("Increasing d_ex for {}".format(targets[cho]))
-                    nest.Disconnect(pre=chosen_sources, post=[neuron['gid']], syn_spec={
-                        'model': 'synapse_ex',
-                        'pre_synaptic_element': 'Axon_ex',
-                        'post_synaptic_element': 'Den_ex'
-                    },
-                        conn_spec={
-                            'rule': 'all_to_all'
-                        }
-                    )
                     for source in chosen_sources:
                         synaptic_elms[source - 1]['ax_ex'] += 1
+                        nest.Disconnect(pre=[source], post=[neuron['gid']], syn_spec={
+                            'model': 'synapse_ex',
+                            'pre_synaptic_element': 'Axon_ex',
+                            'post_synaptic_element': 'Den_ex'
+                        },
+                            conn_spec={
+                                'rule': 'all_to_all'
+                            }
+                        )
                     neuron['d_ex'] += len(chosen_sources)
 
             if 'd_in' in neuron and neuron['d_in'] < 0.0:
@@ -506,17 +508,18 @@ class StructralPlasticityExample:
                 # print("d_in sources: {}".format(sources))
                 if len(sources) > 0:
                     chosen_sources = random.sample(sources, int(abs(neuron['d_in']))) if len(sources) > int(abs(neuron['d_in'])) else sources
-                    nest.Disconnect(pre=chosen_sources, post=[neuron['gid']], syn_spec={
-                        'model': 'synapse_in',
-                        'pre_synaptic_element': 'Axon_in',
-                        'post_synaptic_element': 'Den_in'
-                    },
-                        conn_spec={
-                            'rule': 'all_to_all'
-                        }
-                    )
+                    # print("Deletion targets chosen: {} out of {}, len(sources): {}, neuron['d_in']: {}".format(chosen_sources, sources, len(sources), neuron['d_in']))
                     for source in chosen_sources:
                         synaptic_elms[source - 1]['ax_in'] += 1
+                        nest.Disconnect(pre=[source], post=[neuron['gid']], syn_spec={
+                            'model': 'synapse_in',
+                            'pre_synaptic_element': 'Axon_in',
+                            'post_synaptic_element': 'Den_in'
+                        },
+                            conn_spec={
+                                'rule': 'all_to_all'
+                            }
+                        )
                     neuron['d_in'] += len(chosen_sources)
 
     '''
@@ -561,16 +564,16 @@ class StructralPlasticityExample:
             sys.exit("For simplicity, this example only works " +
                      "for a single process.")
         nest.EnableStructuralPlasticity()
+        nest.Prepare()
         print("Starting simulation")
-        sim_steps = numpy.arange(0, self.t_sim, self.update_interval)
+        sim_steps = numpy.arange(0, self.t_sim, self.update_interval * self.dt)
         for i, step in enumerate(sim_steps):
-            nest.Simulate(self.update_interval)
-            # self.record_ca()
-            # self.record_connectivity()
+            nest.Run(self.update_interval * self.dt)
             self.update_connectivity()
-            if i % 20 == 0:
+            if i % (2 * self.update_interval * self.dt) == 0:
                 print("Progress: " + str(i / 2) + "%")
         print("Simulation finished successfully")
+        nest.Cleanup()
 
 '''
 Finally we take all the functions that we have defined and create the sequence

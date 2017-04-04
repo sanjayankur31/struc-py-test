@@ -350,8 +350,7 @@ class StructralPlasticityExample:
                 # remember to remove the neuron itself
                 for atarget in synaptic_elms:
                     if 'd_ex' in atarget and atarget['d_ex'] > 0.0:
-                        for i in range(0, int(atarget['d_ex'])):
-                            targets.append(atarget['gid'])
+                        targets.extend([atarget['gid']]*int(atarget['d_ex']))
 
                 if len(targets) > 0:
                     chosen_targets = targets if len(targets) < int(neuron['ax_ex']) else random.sample(targets, int(neuron['ax_ex']))
@@ -377,8 +376,7 @@ class StructralPlasticityExample:
                 # remember to remove the neuron itself
                 for atarget in synaptic_elms:
                     if 'd_in' in atarget and atarget['d_in'] > 0.0:
-                        for i in range(0, int(atarget['d_in'])):
-                            targets.append(atarget['gid'])
+                        targets.extend([atarget['gid']]*int(atarget['d_in']))
 
                 if len(targets) > 0:
                     chosen_targets = targets if len(targets) < int(neuron['ax_in']) else random.sample(targets, int(neuron['ax_in']))

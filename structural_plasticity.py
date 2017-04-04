@@ -356,13 +356,14 @@ class StructralPlasticityExample:
                 if len(targets) > 0:
                     chosen_targets = targets if len(targets) < int(neuron['ax_ex']) else random.sample(targets, int(neuron['ax_ex']))
                     # print("Formation targets chosen: {} out of {} - len(targets): {}, neuron['ax_ex']: {}".format(chosen_targets, targets, len(targets), neuron['ax_ex']))
+                    nest.Connect([neuron['gid']], chosen_targets,
+                                 conn_spec='all_to_all',
+                                 syn_spec={'model': 'synapse_ex',
+                                           'pre_synaptic_element': 'Axon_ex',
+                                           'post_synaptic_element': 'Den_ex'
+                                           })
                     for cho in chosen_targets:
                         synaptic_elms[cho - 1]['d_ex'] -= 1
-                        nest.Connect([neuron['gid']], [cho], conn_spec='all_to_all',
-                                    syn_spec={'model': 'synapse_ex',
-                                            'pre_synaptic_element': 'Axon_ex',
-                                            'post_synaptic_element': 'Den_ex'
-                                            })
                     neuron['ax_ex'] -= len(chosen_targets)
 
             if 'ax_in' in neuron and neuron['ax_in'] > 0.0:
@@ -382,13 +383,14 @@ class StructralPlasticityExample:
                 if len(targets) > 0:
                     chosen_targets = targets if len(targets) < int(neuron['ax_in']) else random.sample(targets, int(neuron['ax_in']))
                     # print("Formation targets chosen: {} out of {} - len(targets): {}, neuron['ax_in']: {}".format(chosen_targets, targets, len(targets), neuron['ax_in']))
+                    nest.Connect([neuron['gid']], chosen_targets,
+                                 conn_spec='all_to_all',
+                                 syn_spec={'model': 'synapse_in',
+                                           'pre_synaptic_element': 'Axon_in',
+                                           'post_synaptic_element': 'Den_in'
+                                           })
                     for cho in chosen_targets:
                         synaptic_elms[cho - 1]['d_in'] -= 1
-                        nest.Connect([neuron['gid']], [cho], conn_spec='all_to_all',
-                                    syn_spec={'model': 'synapse_in',
-                                            'pre_synaptic_element': 'Axon_in',
-                                            'post_synaptic_element': 'Den_in'
-                                            })
                     neuron['ax_in'] -= len(chosen_targets)
 
 
